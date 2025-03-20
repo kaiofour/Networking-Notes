@@ -1,0 +1,408 @@
+----------Initial Configuration-----------
+
+ena
+config t
+hostname USCDC
+banner motd $WARNING! Unauthorized attempts and actions to access or use this system is PROHIBITED!!$
+enable secret cisco
+service password-encryption
+line con 0
+password cisco
+login
+exit
+line vty 0 4
+pass cisco
+login
+transport input telnet
+exit
+
+--------Configuring Default Gateway-------
+conf t
+ip default-gateway <ip address>
+end
+copy running-config startup-config
+
+
+---------Telnet Setup----------
+Router Setup
+
+line vty 0 4
+pass cisco
+login
+transport input telnet
+exit
+
+
+Switch Setup
+
+
+line vty 0 4
+pass cisco
+login
+transport input telnet
+exit
+
+int vlan 1
+ip add <address> <subnet>
+no shut
+exit
+
+---------IPv4 Address Interface Router Configuration--------
+LAN Port
+
+int g0/0
+ip add <address> <subnet>
+no shut
+int g0/1
+ip add <address> <subnet>
+no shut
+exit
+
+
+WAN Port
+
+int s0/0/0
+ip add <address> <subnet>
+no shut
+int s0/0/1
+ip add <address> <subnet>
+no shut
+exit
+
+---------IPv4 Static Routing-----------
+Static Routing
+
+ip route <network> <subnet> <exitGateway/Interface>
+
+Default Routing
+
+ip route 0.0.0.0 0.0.0.0 <exitGateway/Interface>
+
+----------IPv4 Dynamic Routing---------
+RIP
+
+router rip
+no auto-summary
+network <>
+exit
+
+
+RIPv2
+
+router rip
+no auto-summ
+ver 2
+network <>
+exit
+
+
+EIGRP
+
+router eigrp <id>
+no auto-summ
+network <ip> <wildcard>
+
+
+OSPF
+
+router ospf <id>
+router-id 1.1.1.1
+network <ip> <wildcard> area 1
+
+----------IPv4 DHCP-----------
+
+ip dhcp excluded <start> <end>
+ip dhcp pool LAN1
+network <address> <subnet>
+default-router <gateway>
+dns-server <address>
+domain-name <string>
+
+[For passing DHCP]
+
+int <interface>
+ip helper <IP address of the router that holds DHCP>
+
+---------Creating a VLAN Trunking Protocol-------------
+
+vtp domain cisco.com
+vtp mode client|server
+
+----------------Creating VLANs-------------------
+
+vlan <id>
+name <vlan name>
+
+int range fa0/1-5
+switch mode acc
+switch acc vlan <id>
+
+
+-------------Creating Port Channel---------------
+
+LACP---
+
+int range <interface>
+channel group <no.> mode passive|active
+exit
+
+int port-channel <no.>
+switchport mode trunk
+swithcport trunk allowed vlan 1-1000
+
+
+PAGP---
+
+int range <interface>
+channel group <no.> mode auto|desirable
+exit
+
+int port-channel <no.>
+switchport mode trunk
+swithcport trunk allowed vlan 1-1000
+
+
+Static---
+
+int range <interface>
+channel-group <no.> mode on
+exit
+
+int port-channel <no.>
+switchport mode trunk
+swithcport trunk allowed vlan 1-1000
+
+-----------Router on a Stick implementation-------------
+
+*this is for diff vlan, therefore diff network addresses should be used
+
+int <interface>
+no shut
+
+int g0/0.10 (sub-int)
+encapsulation dot1q <sub-int>
+ip add <network> <subnetmask>
+no shut
+
+IPv6---
+
+
+ipv6 unicast-routing
+
+int g1/0/24
+no shut
+ipv6 add 2001:db8:acad:100::1/64
+ipv6 add fe80::1 l
+no shut
+
+ipv6 unicast-routing
+int g0/0.200
+encapsulation dot1q 200
+ipv6 add 2001:db8:acad:200::1/64
+ipv6 add fe80::2 l
+no shut
+
+
+--------How to secure ports in a switch?-------
+
+int ra fa0/1-2, fa0/24
+switchport mode access
+switchport port-security
+switchport port-security max 2
+switchport port-security mac sticky
+switchport port-security violation r, s
+
+
+------------IPv6 Address Interface Router Configuration w/ Unicast------------
+LAN Port
+
+en
+conf t
+ipv6 unicast-routing
+int g0/0
+ipv6 add fe80::1 l
+ipv6 add <GUA>/64
+no shut
+exit
+
+
+WAN Port
+
+en
+conf t
+ipv6 unicast-routing
+int s0/0/0
+ipv6 add fe80::1 l
+ipv6 add <GUA>/64
+no shut
+exit
+
+LAN Port w/ RIPng
+
+en
+conf t
+ipv6 unicast-routing
+int g0/0
+ipv6 add fe80::1 l
+ipv6 add <GUA>/64
+ipv6 rip SEX en
+no shut
+exit
+
+
+WAN Port w/ RIPng
+
+en
+conf t
+ipv unicast-routing
+int s0/0/0
+ipv6 add fe80::1 l
+ipv6 add <GUA>/64
+ipv6 rip SEX en
+no shut
+exit
+
+---------IPv6 Static Routing------------
+Static Routing
+
+ipv6 rout <GUA>/64 <exitInt/Interface>
+
+
+Default Routing
+
+ipv6 rout ::0/0 <exitInt/Interface>
+
+
+
+--------Implement SSH to Router--------
+
+ip domain-name cisco.com
+crypto key generate rsa
+1024
+username admin password cisco
+
+line vty 0 4 
+login local
+transport input ssh
+exit
+
+
+--------Local AAA in router----------
+
+username <username> secret <password>
+aaa new-model
+aaa authentication login default local
+line con 0
+login authentication default
+
+ip domain-name cisco.com
+crypto key generate rsa
+1024
+aaa authentication login <name|default> local
+
+line vty 0 4 
+login authentication <name|default>
+transport input ssh
+end
+
+--------------ACL Standard and Extended--------------
+
+Standard---
+
+access-list 10 deny <ip> <wildmask>
+access-list 10 permit 0.0.0.0 255.255.255.255 (any)
+exit
+
+int <interface>
+ip access-group 10 in|out
+
+
+(NAMED)
+ip access-list standard <name>
+deny <ip> <wildcard>
+permit any
+exit
+
+int <interface>
+ip access-group <name> in|out
+
+
+
+(FILTER VTY TRAFFIC (telnet/ssh))
+
+access-list 10 deny host <router ip>
+access-list 10 permit any
+
+line vty 0 4
+access-class 10 in|out
+
+
+
+EXTENDED---
+
+access-list 101 deny tcp <source ip> <wildcard> <destination ip> <wildcard> eq 23(telnet) 22(ssh)
+access-list 101 permit ip 0.0.0.0 255.255.255.255 any
+
+interface <interface>
+ip access-group 101 in|out
+
+(NAMED)
+ip access-list extended <name>
+deny tcp <source ip> <wildcard> host <destination ip> eq 23(telnet) 22(ssh)
+permit ip any 0.0.0.0 255.255.255.255
+exit
+
+int <interface>
+ip access-group <name> in|out
+
+--------Connecting between Static and Dynamic-----------
+IPv4 Redistribute
+
+router rip
+no auto-summ
+ver 2
+redistribute static
+network <>
+exit
+
+IPv6 Redistribute
+
+Method 1 (Interface Config):
+en
+conf t
+ipv6 unicast-routing
+int s0/0/0
+ipv6 add fe80::1 l
+ipv6 add <GUA>/64
+ipv6 rip SEX en
+redistribute static
+no shut
+exit
+
+Method 2 (Global Config):
+en
+config t
+ipv6 unicast-routing
+ipv6 router rip SEX
+redistribute static
+
+-------------Creating a Loopback--------------
+en
+config t
+int loopback 0
+ip add <ip address>
+no shut
+exit
+
+--------COMMANDS FOR VERIFYING CONNECTIVITY----------
+show ip route
+show ip int brief
+show ipv6 interface brief
+show ipv6 route
+ping 2001:db8:acad:1::10
+ssh -l cisco GATEWAY 
+telnet 192.168.0.1
+
+
+
+
