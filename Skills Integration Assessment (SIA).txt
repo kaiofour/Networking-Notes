@@ -1,0 +1,212 @@
+Skills Integration Assessment (SIA) – Ether Channel with STP and Inter-VLAN Routing
+Step 1: Rename Devices (Hostname)
+
+On each switch:
+enable
+configure terminal
+hostname S1
+(Same for S2, S3, S4, and Router = CORE)
+
+
+Step 2: Create VLANs on All Switches
+
+--On every switch (S1–S4):-- S1, S2, S3, S4
+vlan 10
+name Espresso
+vlan 20
+name Latte
+vlan 30
+name Cappuccino
+vlan 99
+name Native
+exit
+
+
+Step 3: Configure EtherChannel
+
+---Between S1 & S2 (Port Channel 1, PAgP, fa0/1-4):---  done
+interface range fa0/1 - 4
+channel-group 1 mode desirable
+switchport mode trunk
+sw trunk native vlan 99
+sw trunk allowed vlan 10,20,30,99
+
+---Between S1 & S3 (Port Channel 2, LACP, fa0/5-8):--- done
+interface range fa0/5 - 8
+channel-group 2 mode active
+switchport mode trunk
+sw trunk native vlan 99
+sw trunk allowed vlan 10,20,30,99
+
+----Between S3 & S4 (Port Channel 3, PAgP, fa0/9-12):---- done
+interface range fa0/9 - 12
+channel-group 3 mode desirable
+switchport mode trunk
+sw trunk native vlan 99
+sw trunk allowed vlan 10,20,30,99
+
+---Between S2 & S4 (Port Channel 4, LACP, fa0/13-16):--- done
+interface range fa0/13 - 16
+channel-group 4 mode active
+switchport mode trunk
+sw trunk native vlan 99
+sw trunk allowed vlan 10,20,30,99
+
+
+---After grouping:---
+
+🔹 S1 ---done
+
+Port Channel 1 → to S2 (fa0/1–4, PAgP)
+
+Port Channel 2 → to S3 (fa0/5–8, LACP)
+
+interface port-channel 1
+switchport mode trunk
+interface port-channel 2
+switchport mode trunk
+
+🔹 S2 ----done
+
+Port Channel 1 → to S1 (fa0/1–4, PAgP)
+
+Port Channel 4 → to S4 (fa0/13–16, LACP)
+
+interface port-channel 1
+switchport mode trunk
+interface port-channel 4
+switchport mode trunk
+
+🔹 S3 ----done
+
+Port Channel 2 → to S1 (fa0/5–8, LACP)
+
+Port Channel 3 → to S4 (fa0/9–12, PAgP)
+
+interface port-channel 2
+switchport mode trunk
+interface port-channel 3
+switchport mode trunk
+
+🔹 S4 ----done
+
+Port Channel 3 → to S3 (fa0/9–12, PAgP)
+
+Port Channel 4 → to S2 (fa0/13–16, LACP)
+
+interface port-channel 3
+switchport mode trunk
+interface port-channel 4
+switchport mode trunk
+
+interface port-channel 1
+switchport mode trunk
+interface port-channel 2
+switchport mode trunk
+interface port-channel 3
+switchport mode trunk
+interface port-channel 4
+switchport mode trunk
+
+
+Step 4: Configure Trunks for Router Connection (S1 to CORE)
+
+----On S1 G0/1:----
+
+interface g0/1
+switchport trunk encapsulation dot1q
+switchport mode trunk
+
+
+Step 5: Configure STP Root Bridge
+
+---Set S1 as root for all VLANs:---
+spanning-tree vlan 10,20,30,99 root primary
+
+
+Step 6: Management VLANs (Assign IPs to Switches) ----DONE
+
+---Example for S1:---
+
+interface vlan 99
+ip address 192.168.1.193 255.255.255.192
+no shut
+ip default-gateway 192.168.1.254  
+
+--For S2, S3, S4:---
+
+S2
+interface vlan 99
+ip address 192.168.1.194 255.255.255.192
+no shut
+ip default-gateway 192.168.1.254
+
+S3
+interface vlan 99
+ip address 192.168.1.195 255.255.255.192
+no shut
+ip default-gateway 192.168.1.254
+
+S4
+interface vlan 99
+ip address 192.168.1.196 255.255.255.192
+no shut
+ip default-gateway 192.168.1.254
+
+--------------------------------------------------------------
+
+Step 7: Configure Router (CORE) – Inter-VLAN Routing
+
+
+Use Router-on-a-Stick:
+
+interface g0/1
+no shutdown
+
+interface g0/1.10
+encapsulation dot1q 10
+ip address 192.168.1.62 255.255.255.192
+description Default Gateway for VLAN 10
+
+interface g0/1.20
+encapsulation dot1q 20
+ip address 192.168.1.126 255.255.255.192
+description Default Gateway for VLAN 20
+
+interface g0/1.30
+encapsulation dot1q 30
+ip address 192.168.1.190 255.255.255.192
+description Default Gateway for VLAN 30
+
+interface g0/1.99
+encapsulation dot1q 99
+ip address 192.168.1.254 255.255.255.192
+description Default Gateway for VLAN 99
+
+-----------------------------
+Step 8: Configure End Devices (DONE)
+
+Each PC should use the 11th usable host address in its VLAN.
+
+PC1 (VLAN 10): 192.168.1.11 /26, Gateway = 192.168.1.62
+
+PC2 (VLAN 20): 192.168.1.75 /26, Gateway = 192.168.1.126
+
+PC3 (VLAN 30): 192.168.1.139 /26, Gateway = 192.168.1.190
+
+
+-----------Step 9: Verify----------------
+
+On switches:
+
+show etherchannel summary
+show spanning-tree
+
+
+On PCs:
+
+Ping PC1 → PC2
+
+Ping PC2 → PC3
+
+Ping PC3 → PC1
